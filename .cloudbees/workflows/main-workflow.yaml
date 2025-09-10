@@ -59,7 +59,6 @@ jobs:
           format: MARKDOWN
     outputs:
       CODE_COVERAGE: ${{ steps.RunUnitTest.outputs.CODE_COVERAGE }}
-
   build-container-image:
     steps:
       - uses: cloudbees-io/checkout@v1
@@ -75,8 +74,7 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USER }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - uses: cloudbees-io/kaniko@v1
-        name: Build and publish container image
-        id: build-image
+        name: Build container image
         kind: build
         with:
           destination: ${{ secrets.DOCKERHUB_USER }}/hackers-organized:${{ cloudbees.scm.sha }}
@@ -89,6 +87,13 @@ jobs:
           file-path: container-image.tar
           file-type: BINARY_CONTAINER
           debug: "true"
+      - name: Register build artifact
+        id: register-artifact
+        uses: cloudbees-io/register-build-artifact@v2
+        with:
+          name: "ldonleycb/hackers-organized"
+          version: "${{ cloudbees.scm.sha }}"
+          url: "${{ secrets.DOCKERHUB_USER }}/hackers-organized:${{ cloudbees.scm.sha }}"
       - name: Publish evidence
         uses: cloudbees-io/publish-evidence-item@v1
         with:
@@ -97,18 +102,12 @@ jobs:
 
             [Docker Hub](https://hub.docker.com/repository/docker/ldonleycb/hackers-organized/tags)
 
-            **Artifact IDs:** ${{ steps.build-image.outputs.artifact-ids }}
-            **Image:** ${{ steps.build-image.outputs.image }}
-            **Tag:** ${{ steps.build-image.outputs.tag }}
-            **Digest:** ${{ steps.build-image.outputs.digest }}
+            **Artifact ID:** ${{ steps.register-artifact.outputs.artifact-id }}
+            **Image:** hackers-organized:${{ cloudbees.scm.sha }}
           format: MARKDOWN
     outputs:
-      ARTIFACT_IDS: ${{ steps.build-image.outputs.artifact-ids }}
-      IMAGE_NAME: ${{ steps.build-image.outputs.image }}
-      IMAGE_TAG: ${{ steps.build-image.outputs.tag }}
-      IMAGE_DIGEST: ${{ steps.build-image.outputs.digest }}
+      ARTIFACT_ID: ${{ steps.register-artifact.outputs.artifact-id }}
     needs: test
-
   scan:
     outputs:
       BLOCKER_COUNT: ${{ steps.FetchSonarQubeIssues.outputs.BLOCKER_COUNT }}
@@ -177,7 +176,6 @@ jobs:
             | MAJOR_COUNT          | ${{ steps.FetchSonarQubeIssues.outputs.MAJOR_COUNT }} |
             | MINOR_COUNT          | ${{ steps.FetchSonarQubeIssues.outputs.MINOR_COUNT }} |
           format: MARKDOWN
-
   deploy:
     environment: DOW Production
     steps:
@@ -194,11 +192,6 @@ jobs:
           kustomization-base-dir: ${{ cloudbees.workspace }}/k8s/base
           kustomization-overlays-dir: ${{ cloudbees.workspace }}/k8s/overlays/prod
           environment-variables: "{}"
-      - name: Register deployed artifact
-        uses: cloudbees-io/register-deployed-artifact@v2
-        with:
-          artifact-id: ${{ fromJSON(needs.build-container-image.outputs.ARTIFACT_IDS)[format('index.docker.io/{0}/hackers-organized:{1}', secrets.DOCKERHUB_USER, cloudbees.scm.sha)] }}
-          target-environment: "DOW Production"
       - name: Publish evidence
         uses: cloudbees-io/publish-evidence-item@v1
         with:
@@ -207,9 +200,15 @@ jobs:
             [Production frontend](https://hackers-organized-prod.preview.cb-demos.io/)
 
             Running hackers-organized:${{ cloudbees.scm.sha }}
-            **Image:** ${{ needs.build-container-image.outputs.IMAGE_NAME }}
-            **Tag:** ${{ needs.build-container-image.outputs.IMAGE_TAG }}
           format: MARKDOWN
+      - name: Register deployed artifact
+        uses: https://github.com/cloudbees-io/register-deployed-artifact@v1
+        with:
+          name: ${{ secrets.DOCKERHUB_USER }}/hackers-organized
+          version: ${{ cloudbees.scm.sha }}
+          url: ${{ secrets.DOCKERHUB_USER }}/hackers-organized:${{ cloudbees.scm.sha }}
+          digest: ""
+          target-environment: "DOW Production"
     needs:
       - build-container-image
       - scan
