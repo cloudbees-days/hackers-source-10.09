@@ -62,7 +62,7 @@ jobs:
 
   build-container-image:
     outputs:
-      artifact-id: ${{ fromJSON(steps.push-image.outputs.artifact-ids)[format('index.docker.io/{0}/hackers-organized:{1}', secrets.DOCKERHUB_USER, cloudbees.scm.sha)] }}
+      ARTIFACT_ID: ${{ steps.register-artifact.outputs.artifact-id }}
     steps:
       - uses: cloudbees-io/checkout@v1
         name: Get source code
@@ -76,7 +76,7 @@ jobs:
           registry: index.docker.io
           username: ${{ secrets.DOCKERHUB_USER }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Push image to OCI registry
+      - name: Build and push image
         id: push-image
         uses: cloudbees-io/kaniko@v1
         kind: build
@@ -91,15 +91,25 @@ jobs:
           file-path: container-image.tar
           file-type: BINARY_CONTAINER
           debug: "true"
+      - name: Register build artifact
+        id: register-artifact
+        uses: cloudbees-io/register-build-artifact@v2
+        with:
+          name: "${{ secrets.DOCKERHUB_USER }}/hackers-organized"
+          version: "${{ cloudbees.scm.sha }}"
+          url: "index.docker.io/${{ secrets.DOCKERHUB_USER }}/hackers-organized:${{ cloudbees.scm.sha }}"
+          digest: "${{ steps.push-image.outputs.digest }}"
       - name: Publish evidence
         uses: cloudbees-io/publish-evidence-item@v1
         with:
           content: |-
             ## Built and pushed image to docker hub
 
-            [Docker Hub](https://hub.docker.com/repository/docker/ldonleycb/hackers-organized/tags)
+            [Docker Hub](https://hub.docker.com/repository/docker/${{ secrets.DOCKERHUB_USER }}/hackers-organized/tags)
 
+            **Artifact ID:** ${{ steps.register-artifact.outputs.artifact-id }}
             **Image:** hackers-organized:${{ cloudbees.scm.sha }}
+            **Digest:** ${{ steps.push-image.outputs.digest }}
           format: MARKDOWN
     needs: test
 
@@ -194,7 +204,7 @@ jobs:
       - name: Register deployed artifact
         uses: cloudbees-io/register-deployed-artifact@v2
         with:
-          artifact-id: ${{ needs.build-container-image.outputs.artifact-id }}
+          artifact-id: ${{ needs.build-container-image.outputs.ARTIFACT_ID }}
           target-environment: lsa33
       - name: Publish evidence
         uses: cloudbees-io/publish-evidence-item@v1
@@ -204,5 +214,5 @@ jobs:
             [Production frontend](https://hackers-organized-prod.preview.cb-demos.io/)
 
             Running hackers-organized:${{ cloudbees.scm.sha }}
-            **Artifact ID:** ${{ needs.build-container-image.outputs.artifact-id }}
+            **Artifact ID:** ${{ needs.build-container-image.outputs.ARTIFACT_ID }}
           format: MARKDOWN
