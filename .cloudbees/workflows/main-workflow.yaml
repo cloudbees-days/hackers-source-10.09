@@ -97,11 +97,16 @@ jobs:
 
             [Docker Hub](https://hub.docker.com/repository/docker/ldonleycb/hackers-organized/tags)
 
-            **Artifact ID:** ${{ steps.build-image.outputs.artifact-id }}
-            **Image:** hackers-organized:${{ cloudbees.scm.sha }}
+            **Artifact IDs:** ${{ steps.build-image.outputs.artifact-ids }}
+            **Image:** ${{ steps.build-image.outputs.image }}
+            **Tag:** ${{ steps.build-image.outputs.tag }}
+            **Digest:** ${{ steps.build-image.outputs.digest }}
           format: MARKDOWN
     outputs:
-      ARTIFACT_ID: ${{ steps.build-image.outputs.artifact-id }}
+      ARTIFACT_IDS: ${{ steps.build-image.outputs.artifact-ids }}
+      IMAGE_NAME: ${{ steps.build-image.outputs.image }}
+      IMAGE_TAG: ${{ steps.build-image.outputs.tag }}
+      IMAGE_DIGEST: ${{ steps.build-image.outputs.digest }}
     needs: test
 
   scan:
@@ -192,7 +197,7 @@ jobs:
       - name: Register deployed artifact
         uses: cloudbees-io/register-deployed-artifact@v2
         with:
-          artifact-id: ${{ needs.build-container-image.outputs.ARTIFACT_ID }}
+          artifact-id: ${{ fromJSON(needs.build-container-image.outputs.ARTIFACT_IDS)[format('index.docker.io/{0}/hackers-organized:{1}', secrets.DOCKERHUB_USER, cloudbees.scm.sha)] }}
           target-environment: "DOW Production"
       - name: Publish evidence
         uses: cloudbees-io/publish-evidence-item@v1
@@ -202,7 +207,8 @@ jobs:
             [Production frontend](https://hackers-organized-prod.preview.cb-demos.io/)
 
             Running hackers-organized:${{ cloudbees.scm.sha }}
-            **Artifact ID:** ${{ needs.build-container-image.outputs.ARTIFACT_ID }}
+            **Image:** ${{ needs.build-container-image.outputs.IMAGE_NAME }}
+            **Tag:** ${{ needs.build-container-image.outputs.IMAGE_TAG }}
           format: MARKDOWN
     needs:
       - build-container-image
