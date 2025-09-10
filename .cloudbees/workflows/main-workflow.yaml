@@ -177,7 +177,7 @@ jobs:
             | MINOR_COUNT          | ${{ steps.FetchSonarQubeIssues.outputs.MINOR_COUNT }} |
           format: MARKDOWN
   deploy:
-    environment: DOW Production
+    environment: lsa33
     steps:
       - name: Checkout
         uses: cloudbees-io/checkout@v1
@@ -206,7 +206,7 @@ jobs:
         uses: cloudbees-io/register-deployed-artifact@v2
         with:
           artifact-id: ${{ needs.build-container-image.outputs.ARTIFACT_ID }}
-          target-environment: "DOW Production"
+          target-environment: "lsa33"
     needs:
       - build-container-image
       - scan
